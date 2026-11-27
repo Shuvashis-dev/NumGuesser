@@ -1,35 +1,39 @@
-from pathlib import Path
 import pickle
-
 import numpy as np
 import streamlit as st
-from PIL import Image, ImageOps
+from PIL import Image
+import sys
 
+st.title("MNIST Digit Guesser")
 
-MODEL_PATH = Path(__file__).resolve().parent / "mnist_classifier_model.pkl"
+with st.spinner("Loading model..."):
+    try:
+        import numpy.core
+        sys.modules['numpy._core'] = numpy.core
+    except:
+        pass
+    
+    @st.cache_resource
+    def load_model():
+        with open("mnist_classifier_model.pkl", "rb") as f:
+            return pickle.load(f)
+    
+    model, scaler = load_model()
 
+uploaded = st.file_uploader("Upload image", type=["png", "jpg", "jpeg"])
 
-@st.cache_resource
-def load_model():
-    with MODEL_PATH.open("rb") as model_file:
-        return pickle.load(model_file)
-
-
-st.title("MNIST Digit Recognition")
-
-model, scaler = load_model()
-uploaded_file = st.file_uploader(
-    "Upload a digit",
-    type=["png", "jpg", "jpeg"],
-)
-
-if uploaded_file is not None:
-    image = Image.open(uploaded_file).convert("L")
-    st.image(image, caption="Uploaded image", width=200)
-
-    image = ImageOps.invert(image).resize((28, 28), Image.Resampling.LANCZOS)
-    image_array = np.asarray(image, dtype=np.float32).reshape(1, 784)
-    scaled_image = scaler.transform(image_array)
-    prediction = model.predict(scaled_image)
-
-    st.success(f"Predicted Number: {prediction[0]}")
+if uploaded:
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        img = Image.open(uploaded).convert("L")
+        st.image(img, width=200)
+    
+    with col2:
+        with st.spinner("Predicting..."):
+            small = img.resize((28, 28))
+            arr = np.array(small).reshape(1, 784).astype(float) / 255.0
+            scaled = scaler.transform(arr)
+            pred = model.predict(scaled)[0]
+        
+        st.write(f"Prediction: {pred}")
